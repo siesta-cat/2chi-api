@@ -1,0 +1,34 @@
+services:
+  twochi-api:
+    build:
+      context: .
+      target: test
+    command: ["gleam", "run"]
+    container_name: twochi-api
+    stop_signal: sigkill
+    ports:
+      - 8000:8000
+    depends_on:
+      - mongodb
+    environment:
+      PORT: 8000
+      MONGODB_URI: "mongodb://mongodb:27017/bot"
+      MONGODB_USER: "root"
+      MONGODB_PASS: "password"
+      JWTSECRET: "cooljwtsecret"
+    develop:
+      watch:
+        - action: rebuild
+          path: .
+
+  mongodb:
+    image: mongo:bionic
+    container_name: twochi-api-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: bot
+    volumes:
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
