@@ -2,7 +2,7 @@
 
 run:
 	docker compose down -v
-	docker compose run --build twochi-api
+	docker compose up --build
 
 test:
 	docker compose down -v

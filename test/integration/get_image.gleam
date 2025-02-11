@@ -1,7 +1,6 @@
 import config
 import context
 import gleam/json
-import gleam/list
 import gleeunit/should
 import image
 import router
@@ -13,12 +12,7 @@ pub fn get_image_returns_valid_images_test() {
 
   let ctx = context.get_context(config)
 
-  let response = router.handle_request(testing.get("/images", []), ctx)
-  let json = response |> testing.string_body()
-  let assert Ok(images) = json.parse(json, twochi_api_test.images_decoder())
-
-  let assert Ok(image) = list.first(images)
-  let id = image.id
+  let id = twochi_api_test.get_first_image_id(ctx)
 
   let response = router.handle_request(testing.get("/images/" <> id, []), ctx)
   response.status |> should.equal(200)

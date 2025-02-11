@@ -3,7 +3,7 @@ services:
     build:
       context: .
       target: test
-    command: ["gleam", "run"]
+    command: ["sh", "-c", "sleep 5 && gleam run"]
     container_name: twochi-api
     stop_signal: sigkill
     ports:

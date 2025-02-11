@@ -1,6 +1,10 @@
 import app
+import bison/bson
+import bison/ejson
 import given
+import gleam/bit_array
 import gleam/bool
+import gleam/dict
 import gleam/dynamic
 import gleam/dynamic/decode
 import gleam/http.{Get, Post, Put}
@@ -105,7 +109,58 @@ fn handle_image(id: String, request: Request, ctx: app.Context) -> Response {
   case request.method {
     Get ->
       wisp.json_response(image.to_json(image) |> json.to_string_tree(), 200)
-    Put -> todo
+    Put -> {
+      use _ <- given.ok(
+        put_image(image, request, ctx),
+        else_return: error_handle,
+      )
+      wisp.response(204)
+    }
     _ -> wisp.method_not_allowed(allowed: [Get, Put])
   }
+}
+
+fn put_image(
+  image: Image,
+  request: Request,
+  ctx: app.Context,
+) -> Result(Nil, String) {
+  use body <- result.try(
+    wisp.read_body_to_bitstring(request)
+    |> result.replace_error("400"),
+  )
+  use json <- result.try(
+    bit_array.to_string(body) |> result.replace_error("400"),
+  )
+
+  use bson <- result.try(
+    ejson.from_canonical(json)
+    |> result.replace_error("400"),
+  )
+
+  // Cannot edit url
+  use <- bool.guard(dict.has_key(bson, "url"), Error("400"))
+
+  // Must contain valid status if has one
+  use <- bool.guard(
+    case dict.get(bson, "status") {
+      Error(_) -> False
+      Ok(status) -> {
+        case status {
+          bson.String(status) -> {
+            case decode.run(dynamic.from(status), status.decoder()) {
+              Error(_) -> True
+              Ok(_) -> False
+            }
+          }
+          _ -> True
+        }
+      }
+    },
+    Error("400"),
+  )
+
+  use _ <- result.try(storage.put_image(image, json, ctx))
+
+  Ok(Nil)
 }
