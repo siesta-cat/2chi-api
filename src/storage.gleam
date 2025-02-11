@@ -48,7 +48,10 @@ pub fn get_images(
 }
 
 fn image_from_bson(bson: bson.Value) -> Result(Image, String) {
-  let assert Document(bson) = bson
+  use bson <- result.try(case bson {
+    Document(bson) -> Ok(bson)
+    _ -> Error("500")
+  })
 
   let json = ejson.to_canonical(bson)
 
@@ -125,4 +128,22 @@ pub fn put_image(
   )
 
   Ok(Nil)
+}
+
+pub fn post_image(
+  image: dict.Dict(String, bson.Value),
+  ctx: app.Context,
+) -> Result(Image, String) {
+  use id <- result.try(
+    mungo.insert_one(ctx.collection, dict.to_list(image), ctx.config.db_timeout)
+    |> result.replace_error("500"),
+  )
+
+  use id <- result.try(case id {
+    bson.ObjectId(id) -> Ok(id)
+    _ -> Error("500")
+  })
+
+  use image <- result.try(get_image(object_id.to_string(id), ctx))
+  Ok(image)
 }

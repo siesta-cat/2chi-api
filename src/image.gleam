@@ -7,7 +7,7 @@ pub type Image {
 }
 
 pub fn decoder() {
-  use id <- decode.field("_id", decode.string)
+  use id <- decode.optional_field("_id", "no_id", decode.string)
   use url <- decode.field("url", decode.string)
   use status <- decode.field("status", status.decoder())
   use tags <- decode.field("tags", decode.list(decode.string))

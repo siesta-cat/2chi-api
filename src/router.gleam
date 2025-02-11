@@ -45,7 +45,14 @@ fn handle_images(request: Request, ctx: app.Context) -> Response {
         200,
       )
     }
-    Post -> todo
+    Post -> {
+      use image <- given.ok(post_image(request, ctx), else_return: error_handle)
+      wisp.json_response(
+        image.to_json(image)
+          |> json.to_string_tree,
+        201,
+      )
+    }
     _ -> wisp.method_not_allowed(allowed: [Get, Post])
   }
 }
@@ -99,6 +106,7 @@ fn error_handle(err: String) -> Response {
     "400" -> wisp.bad_request()
     "404" -> wisp.not_found()
     "500" -> wisp.internal_server_error()
+    "409" -> wisp.response(409)
     _ -> wisp.internal_server_error()
   }
 }
@@ -163,4 +171,36 @@ fn put_image(
   use _ <- result.try(storage.put_image(image, json, ctx))
 
   Ok(Nil)
+}
+
+fn post_image(request: Request, ctx: app.Context) -> Result(Image, String) {
+  use body <- result.try(
+    wisp.read_body_to_bitstring(request)
+    |> result.replace_error("400"),
+  )
+  use json <- result.try(
+    bit_array.to_string(body) |> result.replace_error("400"),
+  )
+
+  use image <- given.ok(json.parse(json, image.decoder()), fn(_) {
+    Error("400")
+  })
+
+  use bson <- result.try(
+    ejson.from_canonical(json)
+    |> result.replace_error("400"),
+  )
+
+  use current_images <- result.try(storage.get_images(0, option.None, ctx))
+
+  use <- bool.guard(
+    list.any(current_images, fn(current_image) {
+      current_image.url == image.url
+    }),
+    Error("409"),
+  )
+
+  use image <- result.try(storage.post_image(bson, ctx))
+
+  Ok(image)
 }
