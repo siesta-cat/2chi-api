@@ -38,14 +38,14 @@ packages = [
 ]
 
 [requirements]
-bison = { version = ">= 1.7.0 and < 2.0.0" }
-given = { version = ">= 5.0.2 and < 6.0.0" }
-gleam_erlang = { version = ">= 0.33.0 and < 1.0.0" }
-gleam_http = { version = ">= 3.7.2 and < 4.0.0" }
-gleam_json = { version = ">= 2.3.0 and < 3.0.0" }
-gleam_stdlib = { version = ">= 0.34.0 and < 2.0.0" }
-gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
-glenvy = { version = ">= 1.2.0 and < 2.0.0" }
-mist = { version = ">= 4.0.5 and < 5.0.0" }
-mungo = { version = ">= 0.27.0 and < 1.0.0" }
-wisp = { version = ">= 1.5.1 and < 2.0.0" }
+bison = { version = "== 1.7.0" }
+given = { version = "== 5.0.2" }
+gleam_erlang = { version = "== 0.33.0" }
+gleam_http = { version = "== 3.7.2" }
+gleam_json = { version = "== 2.3.0" }
+gleam_stdlib = { version = "== 0.52.0" }
+gleeunit = { version = "== 1.2.0" }
+glenvy = { version = "== 1.2.0" }
+mist = { version = "== 4.0.5" }
+mungo = { version = "== 0.27.0" }
+wisp = { version = "== 1.5.1" }
