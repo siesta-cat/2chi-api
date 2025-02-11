@@ -3,7 +3,7 @@ import given
 import gleam/bool
 import gleam/dynamic
 import gleam/dynamic/decode
-import gleam/http.{Get, Post}
+import gleam/http.{Get, Post, Put}
 import gleam/int
 import gleam/json
 import gleam/list
@@ -23,7 +23,7 @@ pub fn handle_request(req: Request, ctx: app.Context) -> Response {
   case wisp.path_segments(req) {
     ["health"] -> wisp.html_response(string_tree.from_string("Ready"), 200)
     ["images"] -> handle_images(req, ctx)
-    ["images", id] -> todo
+    ["images", id] -> handle_image(id, req, ctx)
     _ -> wisp.not_found()
   }
 }
@@ -96,5 +96,16 @@ fn error_handle(err: String) -> Response {
     "404" -> wisp.not_found()
     "500" -> wisp.internal_server_error()
     _ -> wisp.internal_server_error()
+  }
+}
+
+fn handle_image(id: String, request: Request, ctx: app.Context) -> Response {
+  use image <- given.ok(storage.get_image(id, ctx), else_return: error_handle)
+
+  case request.method {
+    Get ->
+      wisp.json_response(image.to_json(image) |> json.to_string_tree(), 200)
+    Put -> todo
+    _ -> wisp.method_not_allowed(allowed: [Get, Put])
   }
 }

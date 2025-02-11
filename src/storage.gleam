@@ -1,6 +1,7 @@
 import app
 import bison/bson.{Document}
 import bison/ejson
+import given
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
@@ -9,6 +10,7 @@ import gleam/result
 import image.{type Image, Image}
 import mungo
 import mungo/cursor
+import mungo/error
 import status
 
 pub fn get_images(
@@ -67,4 +69,22 @@ fn decoder_from_bson() {
   use status <- decode.field("status", status.decoder())
   use tags <- decode.field("tags", decode.list(decode.string))
   decode.success(Image(id:, url:, status:, tags:))
+}
+
+pub fn get_image(id: String, ctx: app.Context) -> Result(Image, String) {
+  use result <- result.try(case
+    mungo.find_by_id(ctx.collection, id, ctx.config.db_timeout)
+  {
+    Ok(result) -> Ok(result)
+    Error(err) ->
+      case err {
+        error.StructureError -> Error("400")
+        _ -> Error("500")
+      }
+  })
+  use result <- given.some(result, else_return: fn() { Error("404") })
+
+  use image <- result.try(image_from_bson(result))
+
+  Ok(image)
 }
