@@ -14,14 +14,13 @@ pub fn decoder() {
   decode.success(Image(id:, url:, status:, tags:))
 }
 
-pub fn to_json(image: Image) -> String {
+pub fn to_json(image: Image) -> json.Json {
   json.object([
     #("_id", json.string(image.id)),
     #("url", json.string(image.url)),
     #("status", json.string(status.to_string(image.status))),
     #("tags", json.array(image.tags, of: json.string)),
   ])
-  |> json.to_string()
 }
 
 pub fn to_json_without_id(image: Image) -> String {

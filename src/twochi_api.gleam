@@ -1,5 +1,5 @@
-import app
 import config
+import context
 import gleam/erlang/process
 import mist
 import router
@@ -12,7 +12,7 @@ pub fn main() {
 
   let assert Ok(config) = config.load_from_env()
 
-  let ctx = app.Context(config:)
+  let ctx = context.get_context(config)
 
   let assert Ok(_) =
     wisp_mist.handler(router.handle_request(_, ctx), secret_key_base)

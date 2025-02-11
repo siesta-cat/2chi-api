@@ -8,6 +8,10 @@ mist = ">= 4.0.5 and < 5.0.0"
 wisp = ">= 1.5.1 and < 2.0.0"
 glenvy = ">= 1.2.0 and < 2.0.0"
 gleam_json = ">= 2.3.0 and < 3.0.0"
+gleam_http = ">= 3.7.2 and < 4.0.0"
+given = ">= 5.0.2 and < 6.0.0"
+mungo = ">= 0.27.0 and < 1.0.0"
+bison = ">= 1.7.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

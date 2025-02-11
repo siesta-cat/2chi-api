@@ -6,4 +6,4 @@ run:
 
 test:
 	docker compose down -v
-	docker compose run --build twochi-api gleam test
+	docker compose run --build twochi-api sh -c "sleep 2 && gleam test"

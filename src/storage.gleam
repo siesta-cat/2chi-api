@@ -1,0 +1,70 @@
+import app
+import bison/bson.{Document}
+import bison/ejson
+import gleam/dynamic/decode
+import gleam/json
+import gleam/list
+import gleam/option
+import gleam/result
+import image.{type Image, Image}
+import mungo
+import mungo/cursor
+import status
+
+pub fn get_images(
+  limit: Int,
+  status: option.Option(String),
+  ctx: app.Context,
+) -> Result(List(Image), String) {
+  use cursor <- result.try(case status {
+    option.None ->
+      mungo.find_all(ctx.collection, [], ctx.config.db_timeout)
+      |> result.replace_error("500")
+    option.Some(status) ->
+      mungo.find_many(
+        ctx.collection,
+        [#("status", bson.String(status))],
+        [],
+        ctx.config.db_timeout,
+      )
+      |> result.replace_error("500")
+  })
+
+  use images <- result.try(
+    result.all(list.map(
+      cursor.to_list(cursor, ctx.config.db_timeout),
+      image_from_bson,
+    )),
+  )
+
+  case limit {
+    0 -> Ok(images)
+    limit -> Ok(list.take(images, limit))
+  }
+}
+
+fn image_from_bson(bson: bson.Value) -> Result(Image, String) {
+  let assert Document(bson) = bson
+
+  let json = ejson.to_canonical(bson)
+
+  use image <- result.try(
+    json.parse(json, decoder_from_bson())
+    |> result.replace_error("500"),
+  )
+
+  Ok(image)
+}
+
+fn oid_decoder() {
+  use id <- decode.field("$oid", decode.string)
+  decode.success(id)
+}
+
+fn decoder_from_bson() {
+  use id <- decode.field("_id", oid_decoder())
+  use url <- decode.field("url", decode.string)
+  use status <- decode.field("status", status.decoder())
+  use tags <- decode.field("tags", decode.list(decode.string))
+  decode.success(Image(id:, url:, status:, tags:))
+}
