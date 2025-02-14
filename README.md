@@ -53,28 +53,6 @@ Allows to insert a new image document.
 
 `POST /images` with body `{ "url": "https://my-images.com/foo.jpg", "status": "available", "tags": ["foo", "bar"] }` will insert the image passed on the request body into the database.
 
-## Installation
-
-To install dependencies:
-
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run dev
-```
-
-For testing, remember:
-
-```bash
-bun run test
-```
-
-This project was created using `bun init` in bun v1.0.13. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
-
 ## Running the tests
 
 `make test`
