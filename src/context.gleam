@@ -13,9 +13,9 @@ pub fn get_context(config: app.Config) -> app.Context {
     <> config.db_host
     <> "/"
     <> config.db_name
-    <> "?authSource=admin" |> io.debug
-
-  let assert Ok(client) = mungo.start(conection_string, config.db_timeout)
+    <> "?authSource=admin"
+  let assert Ok(client) =
+    mungo.start(conection_string |> io.debug, config.db_timeout)
 
   io.println("MongoDB collection: ")
   let collection =
