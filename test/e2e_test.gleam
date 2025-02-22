@@ -1,19 +1,19 @@
 import config
 import gleam/json
 import gleeunit/should
-import image.{Image}
+import image/image
+import image/status
 import router
-import status.{Available, Consumed}
 import wisp/testing
 
 pub fn end_to_end_test() {
   let assert Ok(config) = config.load_from_env()
 
   let original_image =
-    Image(
+    image.Image(
       id: "irrelevant",
       url: "https://test.url.com/e2etest",
-      status: Available,
+      status: status.Available,
       tags: ["2girl", "sleeping"],
     )
 
@@ -38,7 +38,7 @@ pub fn end_to_end_test() {
   gotten_image |> should.equal(posted_image)
 
   let patch =
-    json.object([#("status", json.string(status.to_string(Consumed)))])
+    json.object([#("status", json.string(status.to_string(status.Consumed)))])
     |> json.to_string()
 
   router.handle_request(testing.put("/images/" <> image_id, [], patch), config)
@@ -49,5 +49,5 @@ pub fn end_to_end_test() {
 
   patched_image.url |> should.equal(gotten_image.url)
   patched_image.tags |> should.equal(gotten_image.tags)
-  patched_image.status |> should.equal(Consumed)
+  patched_image.status |> should.equal(status.Consumed)
 }

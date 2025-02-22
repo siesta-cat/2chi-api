@@ -1,8 +1,8 @@
 import config
 import gleam/json
 import gleeunit/should
+import image/status
 import router
-import status.{Available}
 import twochi_api_test
 import wisp/testing
 
@@ -12,7 +12,7 @@ pub fn put_image_returns_204_on_valid_patch_test() {
   let id = twochi_api_test.get_first_image_id(config)
 
   let patch =
-    json.object([#("status", json.string(status.to_string(Available)))])
+    json.object([#("status", json.string(status.to_string(status.Available)))])
     |> json.to_string()
 
   let response =
@@ -26,7 +26,7 @@ pub fn put_image_nonexistant_returns_404_test() {
   let id = "000000000000000000000000"
 
   let patch =
-    json.object([#("status", json.string(status.to_string(Available)))])
+    json.object([#("status", json.string(status.to_string(status.Available)))])
     |> json.to_string()
 
   let response =
@@ -40,7 +40,7 @@ pub fn put_image_invalid_id_returns_400_test() {
   let id = "98439384"
 
   let patch =
-    json.object([#("status", json.string(status.to_string(Available)))])
+    json.object([#("status", json.string(status.to_string(status.Available)))])
     |> json.to_string()
 
   let response =

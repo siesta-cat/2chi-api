@@ -5,8 +5,8 @@ import gleam/int
 import gleam/json
 import gleam/list
 import gleeunit/should
+import image/status
 import router
-import status
 import twochi_api_test
 import wisp/testing
 

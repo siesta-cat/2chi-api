@@ -1,9 +1,9 @@
 import config
 import gleam/json
 import gleeunit/should
-import image
+import image/image
+import image/status
 import router
-import status
 import wisp/testing
 
 pub fn post_images_returns_400_for_malformed_requests_test() {

@@ -1,7 +1,7 @@
 import config
 import gleam/json
 import gleeunit/should
-import image
+import image/image
 import router
 import twochi_api_test
 import wisp/testing

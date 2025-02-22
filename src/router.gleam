@@ -1,11 +1,11 @@
 import app
 import given
-import gleam/http.{Get, Post, Put}
+import gleam/http
 import gleam/int
 import gleam/json
 import gleam/string
 import gleam/string_tree
-import image
+import image/image
 import images
 import wisp.{type Request, type Response}
 
@@ -42,7 +42,7 @@ pub fn handle_request(req: Request, config: app.Config) -> Response {
 
 fn handle_images(request: Request, ctx: app.Context) -> Response {
   case request.method {
-    Get -> {
+    http.Get -> {
       let params = wisp.get_query(request)
       use images <- given.ok(images.get(params, ctx), else_return: error_handle)
       wisp.json_response(
@@ -51,7 +51,7 @@ fn handle_images(request: Request, ctx: app.Context) -> Response {
         200,
       )
     }
-    Post -> {
+    http.Post -> {
       use json <- wisp.require_string_body(request)
       use image <- given.ok(
         images.add(image: json, context: ctx),
@@ -63,7 +63,7 @@ fn handle_images(request: Request, ctx: app.Context) -> Response {
         201,
       )
     }
-    _ -> wisp.method_not_allowed(allowed: [Get, Post])
+    _ -> wisp.method_not_allowed(allowed: [http.Get, http.Post])
   }
 }
 
@@ -71,9 +71,9 @@ fn handle_image(id: String, request: Request, ctx: app.Context) -> Response {
   use image <- given.ok(images.get_image(id, ctx), else_return: error_handle)
 
   case request.method {
-    Get ->
+    http.Get ->
       wisp.json_response(image.to_json(image) |> json.to_string_tree(), 200)
-    Put -> {
+    http.Put -> {
       use json <- wisp.require_string_body(request)
       use _ <- given.ok(
         images.modify(image: image, patch: json, context: ctx),
@@ -81,6 +81,6 @@ fn handle_image(id: String, request: Request, ctx: app.Context) -> Response {
       )
       wisp.response(204)
     }
-    _ -> wisp.method_not_allowed(allowed: [Get, Put])
+    _ -> wisp.method_not_allowed(allowed: [http.Get, http.Put])
   }
 }
