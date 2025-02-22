@@ -1,5 +1,4 @@
 import app
-import context
 import given
 import gleam/http.{Get, Post, Put}
 import gleam/int
@@ -31,7 +30,7 @@ pub fn handle_request(req: Request, config: app.Config) -> Response {
   use <- wisp.rescue_crashes
   use req <- wisp.handle_head(req)
 
-  use ctx <- given.ok(context.get_context(config), else_return: error_handle)
+  use ctx <- given.ok(app.get_context(config), else_return: error_handle)
 
   case wisp.path_segments(req) {
     ["health"] -> wisp.html_response(string_tree.from_string("Ready"), 200)
