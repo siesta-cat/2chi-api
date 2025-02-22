@@ -4,6 +4,8 @@ import bison/ejson
 import bison/object_id
 import given
 import gleam/dict
+import gleam/dynamic/decode
+import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
@@ -12,6 +14,7 @@ import image.{type Image, Image}
 import mungo
 import mungo/cursor
 import mungo/error
+import status
 
 pub fn get_images(
   limit: Int,
@@ -39,7 +42,7 @@ pub fn get_images(
   use images <- result.try(
     result.all(list.map(
       cursor.to_list(cursor, ctx.config.db_timeout),
-      image.from_bson,
+      from_bson,
     ))
     |> result.map_error(fn(err) {
       app.Error(500, "Internal server error", string.inspect(err))
@@ -73,7 +76,7 @@ pub fn get_image(id: String, ctx: app.Context) -> Result(Image, app.Error) {
   })
 
   use image <- result.try(
-    image.from_bson(result)
+    from_bson(result)
     |> result.map_error(fn(err) { app.Error(500, "Internal server error", err) }),
   )
 
@@ -152,4 +155,35 @@ pub fn post_image(
 
   use image <- result.try(get_image(object_id.to_string(id), ctx))
   Ok(image)
+}
+
+fn from_bson(bson: bson.Value) -> Result(Image, String) {
+  use bson <- result.try(case bson {
+    bson.Document(bson) -> Ok(bson)
+    _ -> Error("Invalid image found in db:\n" <> string.inspect(bson))
+  })
+
+  let json = ejson.to_canonical(bson)
+
+  use image <- result.try(
+    json.parse(json, decoder_from_bson())
+    |> result.replace_error(
+      "Invalid image found in db:\n" <> string.inspect(bson),
+    ),
+  )
+
+  Ok(image)
+}
+
+fn decoder_from_bson() {
+  use id <- decode.field("_id", oid_decoder())
+  use url <- decode.field("url", decode.string)
+  use status <- decode.field("status", status.decoder())
+  use tags <- decode.field("tags", decode.list(decode.string))
+  decode.success(Image(id:, url:, status:, tags:))
+}
+
+fn oid_decoder() {
+  use id <- decode.field("$oid", decode.string)
+  decode.success(id)
 }
