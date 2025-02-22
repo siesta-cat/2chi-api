@@ -131,11 +131,11 @@ pub fn put_image(
 }
 
 pub fn post_image(
-  image: dict.Dict(String, bson.Value),
+  image: image.Image,
   ctx: app.Context,
 ) -> Result(Image, app.Error) {
   use id <- result.try(
-    mungo.insert_one(ctx.collection, dict.to_list(image), ctx.config.db_timeout)
+    mungo.insert_one(ctx.collection, to_bson(image), ctx.config.db_timeout)
     |> result.replace_error(app.Error(
       500,
       "Internal server error",
@@ -186,4 +186,12 @@ fn decoder_from_bson() {
 fn oid_decoder() {
   use id <- decode.field("$oid", decode.string)
   decode.success(id)
+}
+
+fn to_bson(image: image.Image) -> List(#(String, bson.Value)) {
+  [
+    #("url", bson.String(image.url)),
+    #("status", bson.String(status.to_string(image.status))),
+    #("tags", bson.Array(list.map(image.tags, fn(tag) { bson.String(tag) }))),
+  ]
 }
