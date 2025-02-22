@@ -23,3 +23,12 @@ pub fn to_string(status: Status) -> String {
     Unavailable -> "unavailable"
   }
 }
+
+pub fn from_string(status: String) -> Result(Status, Nil) {
+  case status {
+    "available" -> Ok(Available)
+    "consumed" -> Ok(Consumed)
+    "unavailable" -> Ok(Unavailable)
+    _ -> Error(Nil)
+  }
+}
