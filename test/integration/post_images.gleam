@@ -1,5 +1,4 @@
 import config
-import context
 import gleam/json
 import gleeunit/should
 import image
@@ -9,8 +8,6 @@ import wisp/testing
 
 pub fn post_images_returns_400_for_malformed_requests_test() {
   let assert Ok(config) = config.load_from_env()
-
-  let ctx = context.get_context(config)
 
   let image =
     image.Image(
@@ -29,14 +26,12 @@ pub fn post_images_returns_400_for_malformed_requests_test() {
     |> json.to_string()
 
   let response =
-    router.handle_request(testing.post("/images", [], invalid_image), ctx)
+    router.handle_request(testing.post("/images", [], invalid_image), config)
   response.status |> should.equal(400)
 }
 
 pub fn post_images_returns_409_for_repeated_requests_test() {
   let assert Ok(config) = config.load_from_env()
-
-  let ctx = context.get_context(config)
 
   let image =
     image.Image(
@@ -48,17 +43,15 @@ pub fn post_images_returns_409_for_repeated_requests_test() {
 
   let image_json = image.to_json_without_id(image)
 
-  router.handle_request(testing.post("/images", [], image_json), ctx)
+  router.handle_request(testing.post("/images", [], image_json), config)
 
   let response =
-    router.handle_request(testing.post("/images", [], image_json), ctx)
+    router.handle_request(testing.post("/images", [], image_json), config)
   response.status |> should.equal(409)
 }
 
 pub fn post_images_returns_201_test() {
   let assert Ok(config) = config.load_from_env()
-
-  let ctx = context.get_context(config)
 
   let image =
     image.Image(
@@ -71,6 +64,6 @@ pub fn post_images_returns_201_test() {
   let image_json = image.to_json_without_id(image)
 
   let response =
-    router.handle_request(testing.post("/images", [], image_json), ctx)
+    router.handle_request(testing.post("/images", [], image_json), config)
   response.status |> should.equal(201)
 }

@@ -1,9 +1,9 @@
 import app
-import gleam/io
+import gleam/result
+import gleam/string
 import mungo
 
-pub fn get_context(config: app.Config) -> app.Context {
-  io.println("MongoDB connection string: ")
+pub fn get_context(config: app.Config) -> Result(app.Context, app.Error) {
   let conection_string =
     "mongodb://"
     <> config.db_user
@@ -14,10 +14,18 @@ pub fn get_context(config: app.Config) -> app.Context {
     <> "/"
     <> config.db_name
     <> "?authSource=admin"
-  let assert Ok(client) = mungo.start(conection_string, config.db_timeout)
+  use client <- result.try(
+    mungo.start(conection_string, config.db_timeout)
+    |> result.map_error(fn(err) {
+      app.Error(
+        500,
+        "Error connecting to database",
+        config.db_host <> "Recieved error: " <> string.inspect(err),
+      )
+    }),
+  )
 
-  io.println("MongoDB collection: ")
   let collection = mungo.collection(client, config.db_collection_name)
 
-  app.Context(config:, collection:)
+  Ok(app.Context(config:, collection:))
 }

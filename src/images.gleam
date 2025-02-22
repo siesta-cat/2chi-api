@@ -11,6 +11,7 @@ import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
+import gleam/string
 import image
 import status
 import storage
@@ -18,14 +19,18 @@ import storage
 pub fn add(
   image json: String,
   context ctx: app.Context,
-) -> Result(image.Image, String) {
+) -> Result(image.Image, app.Error) {
   use image <- given.ok(json.parse(json, image.decoder()), fn(_) {
-    Error("400")
+    Error(app.Error(400, "Invalid image revieved", string.inspect(json)))
   })
 
   use bson <- result.try(
     ejson.from_canonical(json)
-    |> result.replace_error("400"),
+    |> result.replace_error(app.Error(
+      400,
+      "Invalid json revieved",
+      string.inspect(json),
+    )),
   )
 
   use current_images <- result.try(storage.get_images(0, option.None, ctx))
@@ -34,7 +39,7 @@ pub fn add(
     list.any(current_images, fn(current_image) {
       current_image.url == image.url
     }),
-    Error("409"),
+    Error(app.Error(409, "image already on database", string.inspect(image))),
   )
 
   use image <- result.try(storage.post_image(bson, ctx))
@@ -46,14 +51,21 @@ pub fn modify(
   image image: image.Image,
   patch json: String,
   context ctx: app.Context,
-) -> Result(Nil, String) {
+) -> Result(Nil, app.Error) {
   use bson <- result.try(
     ejson.from_canonical(json)
-    |> result.replace_error("400"),
+    |> result.replace_error(app.Error(
+      400,
+      "Invalid json revieved",
+      string.inspect(json),
+    )),
   )
 
   // Cannot edit url
-  use <- bool.guard(dict.has_key(bson, "url"), Error("400"))
+  use <- bool.guard(
+    dict.has_key(bson, "url"),
+    Error(app.Error(400, "Cannot modify image url", string.inspect(json))),
+  )
 
   // Must contain valid status if has one
   use <- bool.guard(
@@ -71,7 +83,7 @@ pub fn modify(
         }
       }
     },
-    Error("400"),
+    Error(app.Error(400, "Invalid image status", string.inspect(json))),
   )
 
   use _ <- result.try(storage.put_image(image, json, ctx))
@@ -82,7 +94,7 @@ pub fn modify(
 pub fn get(
   params: List(#(String, String)),
   ctx: app.Context,
-) -> Result(List(image.Image), String) {
+) -> Result(List(image.Image), app.Error) {
   use limit <- result.try(
     list.find_map(params, fn(item) {
       let #(key, value) = item
@@ -93,10 +105,17 @@ pub fn get(
     })
     |> result.unwrap("0")
     |> int.parse()
-    |> result.replace_error("400"),
+    |> result.replace_error(app.Error(
+      400,
+      "Invalid limit value, must be Int",
+      "",
+    )),
   )
 
-  use <- bool.guard(limit < 0, Error("400"))
+  use <- bool.guard(
+    limit < 0,
+    Error(app.Error(400, "Limit must be 0 or more", int.to_string(limit))),
+  )
 
   let status =
     list.find_map(params, fn(item) {
@@ -114,7 +133,7 @@ pub fn get(
     }
     option.Some(status) -> {
       decode.run(dynamic.from(status), status.decoder())
-      |> result.replace_error("400")
+      |> result.replace_error(app.Error(400, "Invalid status value", status))
       |> result.replace(Nil)
     }
   })
@@ -124,6 +143,6 @@ pub fn get(
   Ok(images)
 }
 
-pub fn get_image(id: String, ctx: app.Context) -> Result(image.Image, String) {
+pub fn get_image(id: String, ctx: app.Context) -> Result(image.Image, app.Error) {
   storage.get_image(id, ctx)
 }

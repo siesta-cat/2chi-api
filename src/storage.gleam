@@ -4,23 +4,29 @@ import bison/ejson
 import bison/object_id
 import given
 import gleam/dict
+import gleam/dynamic/decode
+import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
+import gleam/string
 import image.{type Image, Image}
 import mungo
 import mungo/cursor
 import mungo/error
+import status
 
 pub fn get_images(
   limit: Int,
   status: option.Option(String),
   ctx: app.Context,
-) -> Result(List(Image), String) {
+) -> Result(List(Image), app.Error) {
   use cursor <- result.try(case status {
     option.None ->
       mungo.find_all(ctx.collection, [], ctx.config.db_timeout)
-      |> result.replace_error("500")
+      |> result.map_error(fn(err) {
+        app.Error(500, "failed to conect to db", string.inspect(err))
+      })
     option.Some(status) ->
       mungo.find_many(
         ctx.collection,
@@ -28,14 +34,19 @@ pub fn get_images(
         [],
         ctx.config.db_timeout,
       )
-      |> result.replace_error("500")
+      |> result.map_error(fn(err) {
+        app.Error(500, "failed to conect to db", string.inspect(err))
+      })
   })
 
   use images <- result.try(
     result.all(list.map(
       cursor.to_list(cursor, ctx.config.db_timeout),
-      image.from_bson,
-    )),
+      from_bson,
+    ))
+    |> result.map_error(fn(err) {
+      app.Error(500, "Internal server error", string.inspect(err))
+    }),
   )
 
   case limit {
@@ -44,20 +55,30 @@ pub fn get_images(
   }
 }
 
-pub fn get_image(id: String, ctx: app.Context) -> Result(Image, String) {
+pub fn get_image(id: String, ctx: app.Context) -> Result(Image, app.Error) {
   use result <- result.try(case
     mungo.find_by_id(ctx.collection, id, ctx.config.db_timeout)
   {
     Ok(result) -> Ok(result)
     Error(err) ->
       case err {
-        error.StructureError -> Error("400")
-        _ -> Error("500")
+        error.StructureError -> Error(app.Error(400, "Invalid id value", id))
+        err ->
+          Error(app.Error(
+            500,
+            "Error retrieving value from database",
+            string.inspect(err),
+          ))
       }
   })
-  use result <- given.some(result, else_return: fn() { Error("404") })
+  use result <- given.some(result, else_return: fn() {
+    Error(app.Error(404, "Image not found", id))
+  })
 
-  use image <- result.try(image.from_bson(result))
+  use image <- result.try(
+    from_bson(result)
+    |> result.map_error(fn(err) { app.Error(500, "Internal server error", err) }),
+  )
 
   Ok(image)
 }
@@ -66,19 +87,28 @@ pub fn put_image(
   image: Image,
   patch: String,
   ctx: app.Context,
-) -> Result(Nil, String) {
+) -> Result(Nil, app.Error) {
   use object_id <- result.try(
-    object_id.from_string(image.id) |> result.replace_error("400"),
+    object_id.from_string(image.id)
+    |> result.replace_error(app.Error(
+      400,
+      "Invalid image id",
+      string.inspect(image),
+    )),
   )
 
   use patch_bson <- result.try(
     ejson.from_canonical(patch)
-    |> result.replace_error("400"),
+    |> result.replace_error(app.Error(400, "invalid patch provided", patch)),
   )
 
   use image_bson <- result.try(
     ejson.from_canonical(image.to_json_without_id(image))
-    |> result.replace_error("500"),
+    |> result.replace_error(app.Error(
+      500,
+      "Internal server error",
+      string.inspect(image),
+    )),
   )
 
   let new_image_bson =
@@ -92,7 +122,9 @@ pub fn put_image(
       [],
       ctx.config.db_timeout,
     )
-    |> result.replace_error("500"),
+    |> result.map_error(fn(err) {
+      app.Error(500, "failed to update image", string.inspect(err))
+    }),
   )
 
   Ok(Nil)
@@ -101,17 +133,57 @@ pub fn put_image(
 pub fn post_image(
   image: dict.Dict(String, bson.Value),
   ctx: app.Context,
-) -> Result(Image, String) {
+) -> Result(Image, app.Error) {
   use id <- result.try(
     mungo.insert_one(ctx.collection, dict.to_list(image), ctx.config.db_timeout)
-    |> result.replace_error("500"),
+    |> result.replace_error(app.Error(
+      500,
+      "Internal server error",
+      "Failed to insert image into db " <> string.inspect(image),
+    )),
   )
 
   use id <- result.try(case id {
     bson.ObjectId(id) -> Ok(id)
-    _ -> Error("500")
+    _ ->
+      Error(app.Error(
+        500,
+        "Internal server error",
+        "Cannot extract id from image " <> string.inspect(id),
+      ))
   })
 
   use image <- result.try(get_image(object_id.to_string(id), ctx))
   Ok(image)
+}
+
+fn from_bson(bson: bson.Value) -> Result(Image, String) {
+  use bson <- result.try(case bson {
+    bson.Document(bson) -> Ok(bson)
+    _ -> Error("Invalid image found in db:\n" <> string.inspect(bson))
+  })
+
+  let json = ejson.to_canonical(bson)
+
+  use image <- result.try(
+    json.parse(json, decoder_from_bson())
+    |> result.replace_error(
+      "Invalid image found in db:\n" <> string.inspect(bson),
+    ),
+  )
+
+  Ok(image)
+}
+
+fn decoder_from_bson() {
+  use id <- decode.field("_id", oid_decoder())
+  use url <- decode.field("url", decode.string)
+  use status <- decode.field("status", status.decoder())
+  use tags <- decode.field("tags", decode.list(decode.string))
+  decode.success(Image(id:, url:, status:, tags:))
+}
+
+fn oid_decoder() {
+  use id <- decode.field("$oid", decode.string)
+  decode.success(id)
 }
