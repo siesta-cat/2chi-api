@@ -3,6 +3,7 @@ import bison/ejson
 import gleam/dynamic/decode
 import gleam/json
 import gleam/result
+import gleam/string
 import status.{type Status}
 
 pub type Image {
@@ -38,14 +39,16 @@ pub fn to_json_without_id(image: Image) -> String {
 pub fn from_bson(bson: bson.Value) -> Result(Image, String) {
   use bson <- result.try(case bson {
     bson.Document(bson) -> Ok(bson)
-    _ -> Error("500")
+    _ -> Error("Invalid image found in db:\n" <> string.inspect(bson))
   })
 
   let json = ejson.to_canonical(bson)
 
   use image <- result.try(
     json.parse(json, decoder_from_bson())
-    |> result.replace_error("500"),
+    |> result.replace_error(
+      "Invalid image found in db:\n" <> string.inspect(bson),
+    ),
   )
 
   Ok(image)

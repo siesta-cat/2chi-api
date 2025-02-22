@@ -15,3 +15,7 @@ pub type Config {
     db_collection_name: String,
   )
 }
+
+pub type Error {
+  Error(code: Int, message: String, log: String)
+}

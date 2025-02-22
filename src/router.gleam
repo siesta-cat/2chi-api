@@ -2,19 +2,27 @@ import app
 import context
 import given
 import gleam/http.{Get, Post, Put}
+import gleam/int
 import gleam/json
+import gleam/string
 import gleam/string_tree
 import image
 import images
 import wisp.{type Request, type Response}
 
-fn error_handle(err: String) -> Response {
+fn error_handle(err: app.Error) -> Response {
   case err {
-    "400" -> wisp.bad_request()
-    "404" -> wisp.not_found()
-    "500" -> wisp.internal_server_error()
-    "409" -> wisp.response(409)
-    _ -> wisp.internal_server_error()
+    app.Error(code, message, log) -> {
+      wisp.log_info(
+        string.concat(["Error ", int.to_string(code), " ", message, ": ", log]),
+      )
+      let json =
+        json.object([
+          #("code", json.int(code)),
+          #("error", json.string(message)),
+        ])
+      wisp.json_response(json.to_string_tree(json), code)
+    }
   }
 }
 
