@@ -10,7 +10,7 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
-import image.{type Image, Image}
+import image
 import mungo
 import mungo/cursor
 import mungo/error
@@ -20,7 +20,7 @@ pub fn get_images(
   limit: Int,
   status: option.Option(String),
   ctx: app.Context,
-) -> Result(List(Image), app.Error) {
+) -> Result(List(image.Image), app.Error) {
   use cursor <- result.try(case status {
     option.None ->
       mungo.find_all(ctx.collection, [], ctx.config.db_timeout)
@@ -55,7 +55,7 @@ pub fn get_images(
   }
 }
 
-pub fn get_image(id: String, ctx: app.Context) -> Result(Image, app.Error) {
+pub fn get_image(id: String, ctx: app.Context) -> Result(image.Image, app.Error) {
   use result <- result.try(case
     mungo.find_by_id(ctx.collection, id, ctx.config.db_timeout)
   {
@@ -84,7 +84,7 @@ pub fn get_image(id: String, ctx: app.Context) -> Result(Image, app.Error) {
 }
 
 pub fn put_image(
-  image: Image,
+  image: image.Image,
   patch: String,
   ctx: app.Context,
 ) -> Result(Nil, app.Error) {
@@ -133,7 +133,7 @@ pub fn put_image(
 pub fn post_image(
   image: image.Image,
   ctx: app.Context,
-) -> Result(Image, app.Error) {
+) -> Result(image.Image, app.Error) {
   use id <- result.try(
     mungo.insert_one(ctx.collection, to_bson(image), ctx.config.db_timeout)
     |> result.replace_error(app.Error(
@@ -157,7 +157,7 @@ pub fn post_image(
   Ok(image)
 }
 
-fn from_bson(bson: bson.Value) -> Result(Image, String) {
+fn from_bson(bson: bson.Value) -> Result(image.Image, String) {
   use bson <- result.try(case bson {
     bson.Document(bson) -> Ok(bson)
     _ -> Error("Invalid image found in db:\n" <> string.inspect(bson))
@@ -180,7 +180,7 @@ fn decoder_from_bson() {
   use url <- decode.field("url", decode.string)
   use status <- decode.field("status", status.decoder())
   use tags <- decode.field("tags", decode.list(decode.string))
-  decode.success(Image(id:, url:, status:, tags:))
+  decode.success(image.Image(id:, url:, status:, tags:))
 }
 
 fn oid_decoder() {
