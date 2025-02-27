@@ -8,8 +8,8 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
-import image
-import status
+import image/image
+import image/status
 import storage
 
 pub fn add(

@@ -1,9 +1,9 @@
 import gleam/dynamic/decode
 import gleam/json
-import status.{type Status}
+import image/status
 
 pub type Image {
-  Image(id: String, url: String, status: Status, tags: List(String))
+  Image(id: String, url: String, status: status.Status, tags: List(String))
 }
 
 pub fn decoder() {

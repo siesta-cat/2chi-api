@@ -2,7 +2,7 @@ import gleam/dynamic/decode
 import gleam/json
 import gleam/list
 import gleeunit
-import image
+import image/image
 import router
 import wisp/testing
 
