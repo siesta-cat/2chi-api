@@ -4,7 +4,7 @@ version = "1.0.0"
 [dependencies]
 gleam_stdlib = "== 0.55.0"
 gleam_erlang = "== 0.34.0"
-mist = "== 4.0.6"
+mist = "== 4.0.7"
 wisp = "== 1.5.3"
 glenvy = "== 1.2.0"
 gleam_json = "== 2.3.0"
