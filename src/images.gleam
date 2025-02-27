@@ -59,7 +59,15 @@ pub fn modify(
     Error(app.Error(400, "Cannot modify image url", string.inspect(json))),
   )
 
-  use _ <- result.try(storage.put_image(image, json, ctx))
+  let new_image =
+    image.Image(
+      id: image.id,
+      url: image.url,
+      status: option.unwrap(patch.status, image.status),
+      tags: option.unwrap(patch.tags, image.tags),
+    )
+
+  use _ <- result.try(storage.put_image(new_image, ctx))
 
   Ok(Nil)
 }
