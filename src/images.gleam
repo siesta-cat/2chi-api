@@ -25,12 +25,10 @@ pub fn add(
     )),
   )
 
-  use current_images <- result.try(storage.get_images(0, option.None, ctx))
+  use url_colision <- result.try(storage.url_exists(ctx, image.url))
 
   use <- bool.guard(
-    list.any(current_images, fn(current_image) {
-      current_image.url == image.url
-    }),
+    url_colision,
     Error(app.Error(409, "image already on database", string.inspect(image))),
   )
 

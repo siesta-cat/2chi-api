@@ -13,6 +13,21 @@ import mungo
 import mungo/cursor
 import mungo/error
 
+pub fn url_exists(ctx: app.Context, url: String) -> Result(Bool, app.Error) {
+  use url <- result.try(
+    mungo.find_one(
+      ctx.collection,
+      [#("url", bson.String(url))],
+      [],
+      ctx.config.db_timeout,
+    )
+    |> result.map_error(fn(err) {
+      app.Error(500, "failed to conect to db", string.inspect(err))
+    }),
+  )
+  Ok(option.is_some(url))
+}
+
 pub fn get_images(
   limit: Int,
   status: option.Option(String),
