@@ -21,7 +21,7 @@ pub fn get_image_returns_valid_images_test() {
 pub fn get_image_nonexistant_returns_404_test() {
   let assert Ok(config) = config.load_from_env()
 
-  let id = "000000000000000000000000"
+  let id = "0000000000000000000000000000000000000000"
 
   let response =
     router.handle_request(testing.get("/images/" <> id, []), config)
