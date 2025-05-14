@@ -9,9 +9,9 @@ import image/image
 import images
 import wisp.{type Request, type Response}
 
-fn error_handle(err: app.Error) -> Response {
+fn error_handle(err: app.Err) -> Response {
   case err {
-    app.Error(code, message, log) -> {
+    app.Err(code, message, log) -> {
       wisp.log_info(
         string.concat(["Error ", int.to_string(code), " ", message, ": ", log]),
       )

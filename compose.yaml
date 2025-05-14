@@ -9,26 +9,24 @@ services:
     ports:
       - 8000:8000
     depends_on:
-      - mongodb
+      - postgres
     environment:
       PORT: 8000
-      DB_HOST: "mongodb"
-      DB_NAME: "bot"
-      DB_USER: "root"
+      DB_URI: "postgresql://root@postgres:5432/bot"
       DB_PASS: "password"
     develop:
       watch:
         - action: rebuild
           path: .
 
-  mongodb:
-    image: mongo:bionic
-    container_name: twochi-api-mongodb
+  postgres:
+    image: postgres:17
+    container_name: postgres
     ports:
-      - "27017:27017"
+      - 5432:5432
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: bot
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: bot
     volumes:
-      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
