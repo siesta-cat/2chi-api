@@ -4,6 +4,17 @@
 
 The function of the API is basically to access the images' metadata stored in the database.
 
+## ENV
+
+- PORT: Specify the port the webserver will run on. Default(8000)
+- DB_TABLE: Specify the table images are stored on. Default("images")
+- DB_PASS: Specify the password of the database. Default("")
+- DB_URI: Specify url or file of the database. Default("sqlite.db")
+  - Start with "postgresql://" to use the postgres engine
+  - The postgres url must contain the User, Host, Port and Database
+    Example: "postgresql://root@postgres:5432/bot"
+  - You can specify ":memory:" for in memory DB, this will obviously disable persistance.
+
 ## Usage
 
 The API exposes some endpoints to interact with the database.
@@ -51,7 +62,7 @@ Allows to insert a new image document.
 
 #### Example
 
-`POST /images` with body `{ "url": "https://my-images.com/foo.jpg", "status": "available", "tags": ["foo", "bar"] }` will insert the image passed on the request body into the database.
+`POST /images` with body `{ "url": "https://my-images.com/foo.jpg", "status": "available"}` will insert the image passed on the request body into the database.
 
 ## Running the tests
 
