@@ -1,4 +1,5 @@
 import app
+import context
 import gleam/bool
 import gleam/dynamic
 import gleam/dynamic/decode
@@ -14,37 +15,41 @@ import storage
 
 pub fn add(
   image json: String,
-  context ctx: app.Context,
-) -> Result(image.Image, app.Error) {
+  context ctx: context.Context,
+) -> Result(image.Image, app.Err) {
   use image <- result.try(
     json.parse(json, image.decoder())
-    |> result.replace_error(app.Error(
+    |> result.replace_error(app.Err(
       400,
       "Invalid image revieved",
       string.inspect(json),
     )),
   )
 
-  use url_colision <- result.try(storage.url_exists(ctx, image.url))
+  use url_colision <- result.try(storage.url_exists(
+    image.url,
+    ctx.config.db_table,
+    ctx.db,
+  ))
 
   use <- bool.guard(
     url_colision,
-    Error(app.Error(409, "image already on database", string.inspect(image))),
+    Error(app.Err(409, "image already on database", string.inspect(image))),
   )
 
-  use image <- result.try(storage.post_image(image, ctx))
+  use image <- result.try(storage.post_image(image, ctx.config.db_table, ctx.db))
 
   Ok(image)
 }
 
 pub fn modify(
-  image image: image.Image,
+  id id: String,
   patch json: String,
-  context ctx: app.Context,
-) -> Result(Nil, app.Error) {
+  context ctx: context.Context,
+) -> Result(Nil, app.Err) {
   use patch <- result.try(
     json.parse(json, patch_decoder())
-    |> result.replace_error(app.Error(
+    |> result.replace_error(app.Err(
       400,
       "Invalid image patch revieved",
       string.inspect(json),
@@ -54,26 +59,27 @@ pub fn modify(
   // Cannot edit url
   use <- bool.guard(
     option.is_some(patch.url),
-    Error(app.Error(400, "Cannot modify image url", string.inspect(json))),
+    Error(app.Err(400, "Cannot modify image url", string.inspect(json))),
   )
+
+  use image <- result.try(get_image(id, ctx))
 
   let new_image =
     image.Image(
       id: image.id,
       url: image.url,
       status: option.unwrap(patch.status, image.status),
-      tags: option.unwrap(patch.tags, image.tags),
     )
 
-  use _ <- result.try(storage.put_image(new_image, ctx))
+  use _ <- result.try(storage.put_image(new_image, ctx.config.db_table, ctx.db))
 
   Ok(Nil)
 }
 
 pub fn get(
   params: List(#(String, String)),
-  ctx: app.Context,
-) -> Result(List(image.Image), app.Error) {
+  ctx: context.Context,
+) -> Result(List(image.Image), app.Err) {
   use limit <- result.try(
     list.find_map(params, fn(item) {
       let #(key, value) = item
@@ -84,16 +90,12 @@ pub fn get(
     })
     |> result.unwrap("0")
     |> int.parse()
-    |> result.replace_error(app.Error(
-      400,
-      "Invalid limit value, must be Int",
-      "",
-    )),
+    |> result.replace_error(app.Err(400, "Invalid limit value, must be Int", "")),
   )
 
   use <- bool.guard(
     limit < 0,
-    Error(app.Error(400, "Limit must be 0 or more", int.to_string(limit))),
+    Error(app.Err(400, "Limit must be 0 or more", int.to_string(limit))),
   )
 
   let status =
@@ -112,18 +114,26 @@ pub fn get(
     }
     option.Some(status) -> {
       decode.run(dynamic.from(status), status.decoder())
-      |> result.replace_error(app.Error(400, "Invalid status value", status))
+      |> result.replace_error(app.Err(400, "Invalid status value", status))
       |> result.replace(Nil)
     }
   })
 
-  use images <- result.try(storage.get_images(limit, status, ctx))
+  use images <- result.try(storage.get_images(
+    limit,
+    status,
+    ctx.config.db_table,
+    ctx.db,
+  ))
 
   Ok(images)
 }
 
-pub fn get_image(id: String, ctx: app.Context) -> Result(image.Image, app.Error) {
-  storage.get_image(id, ctx)
+pub fn get_image(
+  id: String,
+  ctx: context.Context,
+) -> Result(image.Image, app.Err) {
+  storage.get_image(id, ctx.config.db_table, ctx.db)
 }
 
 type Patch {

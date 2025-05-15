@@ -1,222 +1,182 @@
 import app
-import bison/bson
-import bison/object_id
 import given
-import gleam/dict
-import gleam/list
+import gleam/bit_array
+import gleam/bool
+import gleam/crypto
+import gleam/dynamic/decode
+import gleam/int
 import gleam/option
 import gleam/result
 import gleam/string
 import image/image
 import image/status
-import mungo
-import mungo/cursor
-import mungo/error
+import pog
+import sqlight
 
-pub fn url_exists(ctx: app.Context, url: String) -> Result(Bool, app.Error) {
-  use url <- result.try(
-    mungo.find_one(
-      ctx.collection,
-      [#("url", bson.String(url))],
-      [],
-      ctx.config.db_timeout,
-    )
-    |> result.map_error(fn(err) {
-      app.Error(500, "failed to conect to db", string.inspect(err))
-    }),
-  )
-  Ok(option.is_some(url))
+pub type DB {
+  Postgres(pog.Connection)
+  Sqlite(sqlight.Connection)
+}
+
+fn decoder() {
+  use id <- decode.field(0, decode.string)
+  use url <- decode.field(1, decode.string)
+  use status <- decode.field(2, status.decoder())
+  decode.success(image.Image(id:, url:, status:))
+}
+
+pub fn run_query(
+  query: String,
+  db: DB,
+  decoder: decode.Decoder(a),
+) -> Result(List(a), app.Err) {
+  case db {
+    Postgres(db) -> {
+      use res <- given.ok(
+        pog.query(query)
+          |> pog.returning(decoder)
+          |> pog.execute(db),
+        query_err,
+      )
+      Ok(res.rows)
+    }
+    Sqlite(db) -> {
+      use res <- given.ok(
+        sqlight.query(query, on: db, with: [], expecting: decoder),
+        query_err,
+      )
+      Ok(res)
+    }
+  }
+}
+
+fn query_err(err) {
+  Error(app.Err(500, "Failed to query DB", string.inspect(err)))
+}
+
+pub fn init_db(table: String, db: DB) -> Result(Nil, app.Err) {
+  let decoder = {
+    decode.success(Nil)
+  }
+
+  let create_table =
+    "CREATE TABLE IF NOT EXISTS "
+    <> table
+    <> " (id TEXT PRIMARY KEY, url TEXT UNIQUE, status TEXT)"
+
+  let create_index =
+    "CREATE INDEX IF NOT EXISTS urls ON " <> table <> " ( url )"
+  use _ <- result.try(run_query(create_table, db, decoder))
+  use _ <- result.try(run_query(create_index, db, decoder))
+
+  Ok(Nil)
+}
+
+pub fn url_exists(url: String, table: String, db: DB) -> Result(Bool, app.Err) {
+  let decoder = {
+    use count <- decode.field(0, decode.int)
+    decode.success(count)
+  }
+
+  let query = "SELECT count(url) FROM " <> table
+  let url = " WHERE url LIKE '" <> url <> "'"
+
+  let query = string.concat([query, url])
+
+  use count <- result.try(run_query(query, db, decoder))
+  case count {
+    [] -> Error(app.Err(500, "Error counting images", ""))
+    [count, ..] -> Ok(count > 0)
+  }
 }
 
 pub fn get_images(
   limit: Int,
   status: option.Option(String),
-  ctx: app.Context,
-) -> Result(List(image.Image), app.Error) {
-  use cursor <- result.try(case status {
-    option.None ->
-      mungo.find_all(ctx.collection, [], ctx.config.db_timeout)
-      |> result.map_error(fn(err) {
-        app.Error(500, "failed to conect to db", string.inspect(err))
-      })
-    option.Some(status) ->
-      mungo.find_many(
-        ctx.collection,
-        [#("status", bson.String(status))],
-        [],
-        ctx.config.db_timeout,
-      )
-      |> result.map_error(fn(err) {
-        app.Error(500, "failed to conect to db", string.inspect(err))
-      })
-  })
+  table: String,
+  db: DB,
+) -> Result(List(image.Image), app.Err) {
+  let query = "SELECT id, url, status FROM " <> table
+  let status = case status {
+    option.None -> ""
+    option.Some(status) -> " WHERE status LIKE '" <> status <> "'"
+  }
+  let limit = case limit {
+    0 -> ""
+    limit -> " LIMIT " <> int.to_string(limit)
+  }
 
-  use images <- result.try(
-    result.all(list.map(
-      cursor.to_list(cursor, ctx.config.db_timeout),
-      from_bson,
-    ))
-    |> result.map_error(fn(err) {
-      app.Error(500, "Internal server error", string.inspect(err))
-    }),
+  let query = string.concat([query, status, limit])
+
+  run_query(query, db, decoder())
+}
+
+pub fn get_image(
+  id: String,
+  table: String,
+  db: DB,
+) -> Result(image.Image, app.Err) {
+  use <- bool.guard(
+    string.length(id) != 40,
+    Error(app.Err(400, "Invalid ID", id)),
   )
 
-  case limit {
-    0 -> Ok(images)
-    limit -> Ok(list.take(images, limit))
+  let query = "SELECT id, url, status FROM " <> table
+  let id = " WHERE id='" <> id <> "'"
+
+  let query = string.concat([query, id])
+
+  use images <- result.try(run_query(query, db, decoder()))
+  case images {
+    [] -> Error(app.Err(404, "Image not found", ""))
+    [image, ..] -> Ok(image)
   }
 }
 
-pub fn get_image(id: String, ctx: app.Context) -> Result(image.Image, app.Error) {
-  use result <- result.try(case
-    mungo.find_by_id(ctx.collection, id, ctx.config.db_timeout)
-  {
-    Ok(result) -> Ok(result)
-    Error(err) ->
-      case err {
-        error.StructureError -> Error(app.Error(400, "Invalid id value", id))
-        err ->
-          Error(app.Error(
-            500,
-            "Error retrieving value from database",
-            string.inspect(err),
-          ))
-      }
-  })
-  use result <- given.some(result, else_return: fn() {
-    Error(app.Error(404, "Image not found", id))
-  })
+pub fn put_image(
+  image: image.Image,
+  table: String,
+  db: DB,
+) -> Result(Nil, app.Err) {
+  let image.Image(id, url, status) = image
+  let status = status.to_string(status)
 
-  use image <- result.try(
-    from_bson(result)
-    |> result.map_error(fn(err) { app.Error(500, "Internal server error", err) }),
-  )
+  let query = "UPDATE " <> table
+  let values =
+    string.concat([
+      " SET id = '",
+      id,
+      "', url= '",
+      url,
+      "', status = '",
+      status,
+      "'",
+    ])
+  let condition = "WHERE id = '" <> id <> "'"
 
-  Ok(image)
-}
+  let query = string.concat([query, values, condition])
 
-pub fn put_image(image: image.Image, ctx: app.Context) -> Result(Nil, app.Error) {
-  use object_id <- result.try(
-    object_id.from_string(image.id)
-    |> result.replace_error(app.Error(
-      400,
-      "Invalid image id",
-      string.inspect(image),
-    )),
-  )
-
-  use _ <- result.try(
-    mungo.update_one(
-      ctx.collection,
-      [#("_id", bson.ObjectId(object_id))],
-      to_bson(image),
-      [],
-      ctx.config.db_timeout,
-    )
-    |> result.map_error(fn(err) {
-      app.Error(500, "failed to update image", string.inspect(err))
-    }),
-  )
-
+  use _ <- result.try(run_query(query, db, decoder()))
   Ok(Nil)
 }
 
 pub fn post_image(
   image: image.Image,
-  ctx: app.Context,
-) -> Result(image.Image, app.Error) {
-  use id <- result.try(
-    mungo.insert_one(ctx.collection, to_bson(image), ctx.config.db_timeout)
-    |> result.replace_error(app.Error(
-      500,
-      "Internal server error",
-      "Failed to insert image into db " <> string.inspect(image),
-    )),
-  )
+  table: String,
+  db: DB,
+) -> Result(image.Image, app.Err) {
+  let image.Image(id: _, url:, status:) = image
 
-  use id <- result.try(case id {
-    bson.ObjectId(id) -> Ok(id)
-    _ ->
-      Error(app.Error(
-        500,
-        "Internal server error",
-        "Cannot extract id from image " <> string.inspect(id),
-      ))
-  })
+  let id = crypto.hash(crypto.Sha1, <<url:utf8>>) |> bit_array.base16_encode
+  let status = status.to_string(status)
 
-  use image <- result.try(get_image(object_id.to_string(id), ctx))
-  Ok(image)
-}
+  let query = "INSERT INTO " <> table
+  let structure = " ( id, url, status )"
+  let values =
+    string.concat([" VALUES ( '", id, "', '", url, "', '", status, "' )"])
 
-fn to_bson(image: image.Image) -> List(#(String, bson.Value)) {
-  [
-    #("url", bson.String(image.url)),
-    #("status", bson.String(status.to_string(image.status))),
-    #("tags", bson.Array(list.map(image.tags, fn(tag) { bson.String(tag) }))),
-  ]
-}
+  let query = string.concat([query, structure, values])
 
-fn from_bson(bson: bson.Value) -> Result(image.Image, String) {
-  use id <- result.try(case bson {
-    bson.Document(bson) ->
-      dict.get(bson, "_id")
-      |> result.replace_error(
-        "Invalid image found in db " <> string.inspect(bson),
-      )
-    _ -> Error("Invalid image found in db " <> string.inspect(bson))
-  })
-  use status <- result.try(case bson {
-    bson.Document(bson) ->
-      dict.get(bson, "status")
-      |> result.replace_error(
-        "Invalid image found in db " <> string.inspect(bson),
-      )
-    _ -> Error("Invalid image found in db " <> string.inspect(bson))
-  })
-  use tags <- result.try(case bson {
-    bson.Document(bson) ->
-      dict.get(bson, "tags")
-      |> result.replace_error(
-        "Invalid image found in db " <> string.inspect(bson),
-      )
-    _ -> Error("Invalid image found in db " <> string.inspect(bson))
-  })
-  use url <- result.try(case bson {
-    bson.Document(bson) ->
-      dict.get(bson, "url")
-      |> result.replace_error(
-        "Invalid image found in db " <> string.inspect(bson),
-      )
-    _ -> Error("Invalid image found in db " <> string.inspect(bson))
-  })
-
-  use id <- result.try(case id {
-    bson.ObjectId(id) -> Ok(object_id.to_string(id))
-    _ -> Error("Invalid id found in db " <> string.inspect(id))
-  })
-  use url <- result.try(case url {
-    bson.String(url) -> Ok(url)
-    _ -> Error("Invalid url found in db " <> string.inspect(url))
-  })
-  use status <- result.try(case status {
-    bson.String(status) ->
-      status.from_string(status)
-      |> result.replace_error(
-        "Invalid status found in db " <> string.inspect(status),
-      )
-    _ -> Error("Invalid status found in db " <> string.inspect(status))
-  })
-  use tags <- result.try(case tags {
-    bson.Array(tags) ->
-      list.map(tags, fn(tag) {
-        case tag {
-          bson.String(tag) -> Ok(tag)
-          _ -> Error("Invalid tag found in db " <> string.inspect(tag))
-        }
-      })
-      |> result.all
-    _ -> Error("Invalid tags found in db " <> string.inspect(tags))
-  })
-
-  Ok(image.Image(id:, status:, tags:, url:))
+  use _ <- result.try(run_query(query, db, decoder()))
+  get_image(id, table, db)
 }

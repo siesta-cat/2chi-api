@@ -1,4 +1,5 @@
 import app
+import context
 import given
 import gleam/http
 import gleam/int
@@ -9,9 +10,9 @@ import image/image
 import images
 import wisp.{type Request, type Response}
 
-fn error_handle(err: app.Error) -> Response {
+fn error_handle(err: app.Err) -> Response {
   case err {
-    app.Error(code, message, log) -> {
+    app.Err(code, message, log) -> {
       wisp.log_info(
         string.concat(["Error ", int.to_string(code), " ", message, ": ", log]),
       )
@@ -25,12 +26,10 @@ fn error_handle(err: app.Error) -> Response {
   }
 }
 
-pub fn handle_request(req: Request, config: app.Config) -> Response {
+pub fn handle_request(req: Request, ctx: context.Context) -> Response {
   use <- wisp.log_request(req)
   use <- wisp.rescue_crashes
   use req <- wisp.handle_head(req)
-
-  use ctx <- given.ok(app.get_context(config), else_return: error_handle)
 
   case wisp.path_segments(req) {
     ["health"] -> wisp.html_response(string_tree.from_string("Ready"), 200)
@@ -40,7 +39,7 @@ pub fn handle_request(req: Request, config: app.Config) -> Response {
   }
 }
 
-fn handle_images(request: Request, ctx: app.Context) -> Response {
+fn handle_images(request: Request, ctx: context.Context) -> Response {
   case request.method {
     http.Get -> {
       let params = wisp.get_query(request)
@@ -67,16 +66,19 @@ fn handle_images(request: Request, ctx: app.Context) -> Response {
   }
 }
 
-fn handle_image(id: String, request: Request, ctx: app.Context) -> Response {
-  use image <- given.ok(images.get_image(id, ctx), else_return: error_handle)
-
+fn handle_image(id: String, request: Request, ctx: context.Context) -> Response {
   case request.method {
-    http.Get ->
+    http.Get -> {
+      use image <- given.ok(
+        images.get_image(id, ctx),
+        else_return: error_handle,
+      )
       wisp.json_response(image.to_json(image) |> json.to_string_tree(), 200)
+    }
     http.Put -> {
       use json <- wisp.require_string_body(request)
       use _ <- given.ok(
-        images.modify(image: image, patch: json, context: ctx),
+        images.modify(id:, patch: json, context: ctx),
         else_return: error_handle,
       )
       wisp.response(204)
