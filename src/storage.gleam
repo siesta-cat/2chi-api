@@ -138,7 +138,26 @@ pub fn put_image(
   table: String,
   db: DB,
 ) -> Result(Nil, app.Err) {
-  todo
+  let image.Image(id, url, status) = image
+  let status = status.to_string(status)
+
+  let query = "UPDATE " <> table
+  let values =
+    string.concat([
+      " SET id = '",
+      id,
+      "', url= '",
+      url,
+      "', status = '",
+      status,
+      "'",
+    ])
+  let condition = "WHERE id = '" <> id <> "'"
+
+  let query = string.concat([query, values, condition])
+
+  use _ <- result.try(run_query(query, db, decoder()))
+  Ok(Nil)
 }
 
 pub fn post_image(

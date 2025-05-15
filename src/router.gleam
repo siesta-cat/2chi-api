@@ -67,15 +67,18 @@ fn handle_images(request: Request, ctx: context.Context) -> Response {
 }
 
 fn handle_image(id: String, request: Request, ctx: context.Context) -> Response {
-  use image <- given.ok(images.get_image(id, ctx), else_return: error_handle)
-
   case request.method {
-    http.Get ->
+    http.Get -> {
+      use image <- given.ok(
+        images.get_image(id, ctx),
+        else_return: error_handle,
+      )
       wisp.json_response(image.to_json(image) |> json.to_string_tree(), 200)
+    }
     http.Put -> {
       use json <- wisp.require_string_body(request)
       use _ <- given.ok(
-        images.modify(image: image, patch: json, context: ctx),
+        images.modify(id:, patch: json, context: ctx),
         else_return: error_handle,
       )
       wisp.response(204)

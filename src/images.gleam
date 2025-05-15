@@ -43,7 +43,7 @@ pub fn add(
 }
 
 pub fn modify(
-  image image: image.Image,
+  id id: String,
   patch json: String,
   context ctx: context.Context,
 ) -> Result(Nil, app.Err) {
@@ -61,6 +61,8 @@ pub fn modify(
     option.is_some(patch.url),
     Error(app.Err(400, "Cannot modify image url", string.inspect(json))),
   )
+
+  use image <- result.try(get_image(id, ctx))
 
   let new_image =
     image.Image(
