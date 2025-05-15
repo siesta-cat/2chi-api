@@ -1,4 +1,5 @@
 import app
+import context
 import given
 import gleam/http
 import gleam/int
@@ -25,12 +26,10 @@ fn error_handle(err: app.Err) -> Response {
   }
 }
 
-pub fn handle_request(req: Request, config: app.Config) -> Response {
+pub fn handle_request(req: Request, ctx: context.Context) -> Response {
   use <- wisp.log_request(req)
   use <- wisp.rescue_crashes
   use req <- wisp.handle_head(req)
-
-  use ctx <- given.ok(app.get_context(config), else_return: error_handle)
 
   case wisp.path_segments(req) {
     ["health"] -> wisp.html_response(string_tree.from_string("Ready"), 200)
@@ -40,7 +39,7 @@ pub fn handle_request(req: Request, config: app.Config) -> Response {
   }
 }
 
-fn handle_images(request: Request, ctx: app.Context) -> Response {
+fn handle_images(request: Request, ctx: context.Context) -> Response {
   case request.method {
     http.Get -> {
       let params = wisp.get_query(request)
@@ -67,7 +66,7 @@ fn handle_images(request: Request, ctx: app.Context) -> Response {
   }
 }
 
-fn handle_image(id: String, request: Request, ctx: app.Context) -> Response {
+fn handle_image(id: String, request: Request, ctx: context.Context) -> Response {
   use image <- given.ok(images.get_image(id, ctx), else_return: error_handle)
 
   case request.method {

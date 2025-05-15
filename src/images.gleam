@@ -1,4 +1,5 @@
 import app
+import context
 import gleam/bool
 import gleam/dynamic
 import gleam/dynamic/decode
@@ -14,7 +15,7 @@ import storage
 
 pub fn add(
   image json: String,
-  context ctx: app.Context,
+  context ctx: context.Context,
 ) -> Result(image.Image, app.Err) {
   use image <- result.try(
     json.parse(json, image.decoder())
@@ -25,14 +26,18 @@ pub fn add(
     )),
   )
 
-  use url_colision <- result.try(storage.url_exists(image.url, ctx))
+  use url_colision <- result.try(storage.url_exists(
+    image.url,
+    ctx.config.db_table,
+    ctx.db,
+  ))
 
   use <- bool.guard(
     url_colision,
     Error(app.Err(409, "image already on database", string.inspect(image))),
   )
 
-  use image <- result.try(storage.post_image(image, ctx))
+  use image <- result.try(storage.post_image(image, ctx.config.db_table, ctx.db))
 
   Ok(image)
 }
@@ -40,7 +45,7 @@ pub fn add(
 pub fn modify(
   image image: image.Image,
   patch json: String,
-  context ctx: app.Context,
+  context ctx: context.Context,
 ) -> Result(Nil, app.Err) {
   use patch <- result.try(
     json.parse(json, patch_decoder())
@@ -64,14 +69,14 @@ pub fn modify(
       status: option.unwrap(patch.status, image.status),
     )
 
-  use _ <- result.try(storage.put_image(new_image, ctx))
+  use _ <- result.try(storage.put_image(new_image, ctx.config.db_table, ctx.db))
 
   Ok(Nil)
 }
 
 pub fn get(
   params: List(#(String, String)),
-  ctx: app.Context,
+  ctx: context.Context,
 ) -> Result(List(image.Image), app.Err) {
   use limit <- result.try(
     list.find_map(params, fn(item) {
@@ -112,13 +117,21 @@ pub fn get(
     }
   })
 
-  use images <- result.try(storage.get_images(limit, status, ctx))
+  use images <- result.try(storage.get_images(
+    limit,
+    status,
+    ctx.config.db_table,
+    ctx.db,
+  ))
 
   Ok(images)
 }
 
-pub fn get_image(id: String, ctx: app.Context) -> Result(image.Image, app.Err) {
-  storage.get_image(id, ctx)
+pub fn get_image(
+  id: String,
+  ctx: context.Context,
+) -> Result(image.Image, app.Err) {
+  storage.get_image(id, ctx.config.db_table, ctx.db)
 }
 
 type Patch {
